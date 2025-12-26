@@ -45,6 +45,9 @@ env = FastAPIAppEnvironment(
         disk="20Gi",
         shm="20Gi",
     ),
+    scaling=flyte.app.Scaling(
+        replicas=1,
+    ),
     # Include web demo files (index.html and app.py)
     include=["demo/web/index.html", "demo/web/app.py", "demo/voices/**/*.pt"],
     # Environment variables for model configuration

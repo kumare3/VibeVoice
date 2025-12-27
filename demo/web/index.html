@@ -376,6 +376,15 @@
     </section>
 
     <section class="panel">
+      <span class="field-label">Latency Metrics</span>
+      <div class="metrics">
+        <span>Time to First Byte<strong id="ttfbMetric">-</strong><span class="metric-unit">ms</span></span>
+        <span>Model Processing<strong id="processingMetric">-</strong><span class="metric-unit">ms</span></span>
+        <span>Network Overhead<strong id="networkMetric">-</strong><span class="metric-unit">ms</span></span>
+      </div>
+    </section>
+
+    <section class="panel">
       <span class="field-label">Runtime Logs</span>
       <pre id="logOutput"></pre>
     </section>
@@ -409,6 +418,9 @@
   const logOutput = document.getElementById('logOutput');
   const resetBtn = document.getElementById('resetControls');
   const saveBtn = document.getElementById('saveAudio');
+  const ttfbMetricLabel = document.getElementById('ttfbMetric');
+  const processingMetricLabel = document.getElementById('processingMetric');
+  const networkMetricLabel = document.getElementById('networkMetric');
 
   let playbackTimer = null;
   let lastPlaybackElapsed = 0;
@@ -422,6 +434,12 @@
   let recordedSamples = 0;
   let recordingComplete = false;
   let downloadUrl = null;
+
+  // Latency tracking variables
+  let requestStartTime = null;
+  let backendRequestReceivedTime = null;
+  let backendFirstChunkSentTime = null;
+  let frontendFirstChunkReceivedTime = null;
 
   const revokeDownloadUrl = () => {
     if (downloadUrl) {
@@ -537,6 +555,45 @@
     const capped = Math.min(modelGeneratedTotal, Math.max(0, value));
     lastPlaybackElapsed = capped;
     playbackElapsedLabel.textContent = formatSeconds(lastPlaybackElapsed);
+  };
+
+  const resetLatencyMetrics = () => {
+    requestStartTime = null;
+    backendRequestReceivedTime = null;
+    backendFirstChunkSentTime = null;
+    frontendFirstChunkReceivedTime = null;
+    if (ttfbMetricLabel) ttfbMetricLabel.textContent = '-';
+    if (processingMetricLabel) processingMetricLabel.textContent = '-';
+    if (networkMetricLabel) networkMetricLabel.textContent = '-';
+  };
+
+  const updateLatencyMetrics = () => {
+    if (!frontendFirstChunkReceivedTime || !requestStartTime) {
+      return;
+    }
+
+    // Calculate TTFB (Time to First Byte)
+    const ttfb = frontendFirstChunkReceivedTime - requestStartTime;
+    if (ttfbMetricLabel) {
+      ttfbMetricLabel.textContent = ttfb.toFixed(0);
+    }
+
+    // Calculate model processing time
+    let processingTime = null;
+    if (backendRequestReceivedTime && backendFirstChunkSentTime) {
+      processingTime = backendFirstChunkSentTime - backendRequestReceivedTime;
+      if (processingMetricLabel) {
+        processingMetricLabel.textContent = processingTime.toFixed(0);
+      }
+    }
+
+    // Calculate network overhead
+    if (processingTime !== null) {
+      const networkOverhead = ttfb - processingTime;
+      if (networkMetricLabel) {
+        networkMetricLabel.textContent = networkOverhead.toFixed(0);
+      }
+    }
   };
 
   const STREAMING_WPM = 180;
@@ -742,10 +799,18 @@
         const voice = data.voice || 'default';
         const textLength = data.text_length ?? 0;
         appendLog(`[Backend]  Received request`, timestamp);
+        // Capture backend request received timestamp
+        if (timestamp && !backendRequestReceivedTime) {
+          backendRequestReceivedTime = parseTimestamp(timestamp).getTime();
+        }
         break;
       }
       case 'backend_first_chunk_sent':
         appendLog('[Backend]  Sent first audio chunk', timestamp);
+        // Capture backend first chunk sent timestamp
+        if (timestamp && !backendFirstChunkSentTime) {
+          backendFirstChunkSentTime = parseTimestamp(timestamp).getTime();
+        }
         break;
       case 'model_progress':
         if (typeof data.generated_sec !== 'undefined') {
@@ -912,6 +977,10 @@
 
     resetState(true);
     clearRecordedChunks();
+    resetLatencyMetrics();
+
+    // Capture request start time
+    requestStartTime = Date.now();
     isPlaying = true;
     previewActive = true;
     updateStreamingPreview();
@@ -956,7 +1025,11 @@
 
       if (!firstBrowserChunkLogged) {
         firstBrowserChunkLogged = true;
+        // Capture frontend first chunk received timestamp
+        frontendFirstChunkReceivedTime = Date.now();
         appendLog('[Frontend] Received first audio chunk');
+        // Update latency metrics
+        updateLatencyMetrics();
       }
     };
 

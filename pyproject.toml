@@ -34,7 +34,7 @@ dependencies = [
     "aiortc",
     "uvicorn[standard]",
     "fastapi",
-    "flyte>=2.0.0b40",
+    "flyte>=2.0.0b43",
 ]
 
 

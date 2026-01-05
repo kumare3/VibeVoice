@@ -29,6 +29,8 @@ image = (
     flyte.Image.from_debian_base(name="vibevoice-realtime", python_version=(3, 12))
     .with_apt_packages("ffmpeg", "git")  # ffmpeg for audio processing, git for model downloads
     .with_uv_project(Path(__file__).parent / "pyproject.toml", pre=True)
+    .with_commands(commands=["mkdir -p demo/voices"])
+    .with_source_folder(Path(__file__).parent / "demo" / "voices", "demo/voices")
 )
 
 # Configure Flyte environment for deployment
@@ -48,8 +50,20 @@ env = FastAPIAppEnvironment(
     scaling=flyte.app.Scaling(
         replicas=1,
     ),
+    links=[
+        flyte.app.Link(
+            path="/info",
+            title="Info JSON",
+            is_relative=True,
+        ),
+        flyte.app.Link(
+            path="/docs",
+            title="Open API playground",
+            is_relative=True,
+        ),
+    ],
     # Include web demo files (index.html and app.py)
-    include=["demo/web/index.html", "demo/web/app.py", "demo/voices/**/*.pt"],
+    include=["demo/web/index.html", "demo/web/app.py"],
     # Environment variables for model configuration
     env_vars={
         "MODEL_PATH": "microsoft/VibeVoice-Realtime-0.5b",  # HuggingFace model ID

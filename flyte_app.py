@@ -70,7 +70,6 @@ env = FastAPIAppEnvironment(
         "MODEL_DEVICE": "cuda",  # Use GPU for inference
         "VOICE_PRESET": "en-WHTest_man",  # Default voice preset
     },
-    requires_auth=False,  # Set to True if authentication is needed
 )
 
 
